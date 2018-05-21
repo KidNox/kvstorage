@@ -7,8 +7,7 @@ public class KVFileStorage extends KVStorage {
     private final StreamFactory streamFactory;
 
     public KVFileStorage(File file) {
-        this.file = file;
-        this.streamFactory = new StreamFactory() {
+        this(file, new StreamFactory() {
             @Override public InputStream inputStream(File file) throws IOException {
                 return new FileInputStream(file);
             }
@@ -16,7 +15,7 @@ public class KVFileStorage extends KVStorage {
             @Override public OutputStream outputStream(File file) throws IOException {
                 return new FileOutputStream(file);
             }
-        };
+        });
     }
 
     public KVFileStorage(File file, StreamFactory streamFactory) {
@@ -32,29 +31,32 @@ public class KVFileStorage extends KVStorage {
                 throw new IOException("can't restore from backup");
             }
         }
-        createIfNotExists(file);
-        InputStream stream = streamFactory.inputStream(file);
-        int size = stream.available();
-        byte[] buffer = new byte[size];
-        int read = stream.read(buffer);
-        if (size != read) {
-            throw new IOException("can't read file " + size + " " + read);
+        if (file.exists()) {
+            InputStream stream = streamFactory.inputStream(file);
+            int size = stream.available();
+            byte[] buffer = new byte[size];
+            int read = stream.read(buffer);
+            if (size != read) {
+                throw new IOException("can't read file " + size + " " + read);
+            }
+            stream.close();
+            return buffer;
+        } else {
+            return new byte[0];
         }
-        stream.close();
-        return buffer;
     }
 
     @Override protected void writeNewBuffer(byte[] newBuffer) throws IOException {
         File backupFile = backupFile();
-        if (!backupFile.exists()) {
-            if (!file.renameTo(backupFile)) {
+        if (!backupFile.exists()) {////else use current backup file
+            if (file.exists() && !file.renameTo(backupFile)) {
                 throw new IOException("can't create backup");
             }
-        } else {//use current backup file
-            deleteIfExists(file);
+        }
+        if (!file.exists() && !file.createNewFile()) {
+            throw new IOException("can't create new file");
         }
         try {
-            createIfNotExists(file);
             writeBuffer(newBuffer, file);
             deleteIfExists(backupFile);
         } catch (IOException ex) {
@@ -76,9 +78,5 @@ public class KVFileStorage extends KVStorage {
 
     private static boolean deleteIfExists(File file) {
         return !file.exists() || file.delete();
-    }
-
-    private static boolean createIfNotExists(File file) throws IOException {
-        return file.exists() || file.createNewFile();
     }
 }

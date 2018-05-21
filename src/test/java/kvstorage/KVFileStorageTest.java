@@ -11,6 +11,8 @@ import java.io.IOException;
 import static kvstorage.Utils.getRandomBytes;
 import static kvstorage.Utils.getRandomKV;
 import static org.junit.Assert.assertArrayEquals;
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.fail;
 
 public class KVFileStorageTest {
     @Rule public TemporaryFolder folder = new TemporaryFolder();
@@ -75,5 +77,55 @@ public class KVFileStorageTest {
         assertArrayEquals(keyValues[0].value, storage.get(tested.key));
         assertArrayEquals(keyValues[2].value, storage.get(tested2.key));
         assertArrayEquals(keyValues[4].value, storage.get(tested3.key));
+    }
+
+    @Test public void testBrokenOutput() throws IOException {
+        KVStorage storage = new KVFileStorage(file);
+        byte[] key1 = getRandomBytes(16);
+        byte[] value1 = getRandomBytes(128);
+        byte[] key2 = getRandomBytes(33);
+        byte[] value2 = getRandomBytes(99);
+        storage.put(key1, value1);
+        storage = new KVFileStorage(file, Utils.brokenOutput());
+        try {
+            storage.put(key2, value2);
+            fail();
+        } catch (IOException ignored) {//expected
+        }
+        storage = new KVFileStorage(file);//must restore from backup
+        assertArrayEquals(value1, storage.get(key1));
+        assertNull(storage.get(key2));
+        storage.put(key2, value2);
+        assertArrayEquals(value2, storage.get(key2));
+    }
+
+    @Test public void testBrokenOutput2() throws IOException {
+        KVStorage storage = new KVFileStorage(file);
+        byte[] key1 = getRandomBytes(16);
+        byte[] value1 = getRandomBytes(128);
+        byte[] key2 = getRandomBytes(33);
+        byte[] value2 = getRandomBytes(42);
+        storage.put(key1, value1);
+        storage = new KVFileStorage(file, Utils.brokenOutput());
+        try {
+            storage.put(key2, getRandomBytes(66));
+            fail();
+        } catch (IOException ignored) {//expected
+        }
+        storage = new KVFileStorage(file);//must restore from backup
+        assertArrayEquals(value1, storage.get(key1));
+        assertNull(storage.get(key2));
+        storage = new KVFileStorage(file, Utils.brokenOutput());//check backup on permanent fail
+        try {
+            storage.put(key2, getRandomBytes(66));
+            fail();
+        } catch (IOException ignored) {//expected
+        }
+        storage = new KVFileStorage(file);//must restore from backup
+        assertArrayEquals(value1, storage.get(key1));
+        storage.put(key2, value2);
+        storage = new KVFileStorage(file);
+        assertArrayEquals(value1, storage.get(key1));
+        assertArrayEquals(value2, storage.get(key2));
     }
 }
