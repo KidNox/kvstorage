@@ -4,6 +4,7 @@ import static kvstorage.ByteUtils.*;
 
 final class ByteEntry {
     static final int LENGTH = 14;
+    static final int KEY_MAX_LENGTH = Short.MAX_VALUE;
 
     final int position;
     final long hash;

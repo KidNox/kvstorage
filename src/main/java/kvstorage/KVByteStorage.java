@@ -22,6 +22,8 @@ public abstract class KVByteStorage implements KVStorage {
 
     protected abstract byte[] readBuffer() throws IOException;
 
+    protected abstract void writeBuffer(byte[] newBuffer) throws IOException;
+
     private void readEntries(byte[] buffer) throws IOException {
         entries.clear();
         int size = buffer.length;
@@ -33,6 +35,10 @@ public abstract class KVByteStorage implements KVStorage {
                 throw new IOException("corrupted buffer " + offset + " " + size + " " + entries.size());
             }
             entries.add(entry = ByteEntry.read(offset, buffer));
+            if (entry.keyLength <= 0)
+                throw new IOException("corrupted buffer " + offset + " " + size + " keyLength " + entry.keyLength);
+            if (entry.valueLength < 0)
+                throw new IOException("corrupted buffer " + offset + " " + size + " valueLength " + entry.valueLength);
             offset = entry.nextPosition();
         }
     }
@@ -48,20 +54,20 @@ public abstract class KVByteStorage implements KVStorage {
         for (KeyValue kv : keyValues) {
             currentBuffer = writeToBuffer(kv.key, kv.value, currentBuffer);
         }
-        writeNewBuffer(currentBuffer);
+        writeNewBufferInternal(currentBuffer);
     }
 
     @Override public void put(byte[] key, byte[] value) throws IOException {
         ensureBufferInitialized();
         byte[] tempBuffer = writeToBuffer(key, value, buffer);
-        writeNewBuffer(tempBuffer);
+        writeNewBufferInternal(tempBuffer);
     }
 
     @Override public boolean remove(byte[] key) throws IOException {
         ensureBufferInitialized();
         byte[] tempBuffer = writeToBuffer(key, null, buffer);
         if (buffer != tempBuffer) {
-            writeNewBuffer(tempBuffer);
+            writeNewBufferInternal(tempBuffer);
             return true;
         }
         return false;
@@ -69,7 +75,8 @@ public abstract class KVByteStorage implements KVStorage {
 
     private byte[] writeToBuffer(byte[] key, byte[] value, byte[] buffer) {
         if (key.length == 0) throw new IllegalArgumentException("zero key length");
-        if (key.length > Short.MAX_VALUE) throw new IllegalArgumentException("key length > 32767");
+        if (key.length > ByteEntry.KEY_MAX_LENGTH)
+            throw new IllegalArgumentException("key length > " + ByteEntry.KEY_MAX_LENGTH);
         long hash = hash(key);
         ByteEntry current = find(key, hash, buffer);
         if (current != null) {
@@ -94,7 +101,18 @@ public abstract class KVByteStorage implements KVStorage {
 
     @Override public void clear() throws IOException {
         entries.clear();
-        writeNewBuffer(new byte[0]);
+        writeNewBufferInternal(new byte[0]);
+    }
+
+    private void writeNewBufferInternal(byte[] newBuffer) throws IOException {
+        try {
+            writeBuffer(newBuffer);
+            buffer = newBuffer;
+        } finally {
+            if (buffer != newBuffer) {
+                readEntries(buffer);
+            }
+        }
     }
 
     private ByteEntry find(byte[] key, long hash, byte[] buffer) {
@@ -177,9 +195,5 @@ public abstract class KVByteStorage implements KVStorage {
             }
         }
         return tempBuffer;
-    }
-
-    protected void writeNewBuffer(byte[] newBuffer) throws IOException {
-        buffer = newBuffer;
     }
 }

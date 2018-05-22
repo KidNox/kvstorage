@@ -103,6 +103,15 @@ public class KVStorageAdapter extends AbstractEditor {
         return this;
     }
 
+    @Override public AbstractEditor remove(byte[] key) {
+        try {
+            storage.remove(key);
+        } catch (IOException e) {
+            exceptionHandler.handleException(e);
+        }
+        return this;
+    }
+
     public final Editor bulkInsert() {
         return new Editor();
     }
@@ -112,6 +121,11 @@ public class KVStorageAdapter extends AbstractEditor {
 
         @Override public Editor put(byte[] key, byte[] value) {
             list.add(new KVStorage.KeyValue(key, value));
+            return this;
+        }
+
+        @Override public Editor remove(byte[] key) {
+            list.add(new KVStorage.KeyValue(key, null));
             return this;
         }
 

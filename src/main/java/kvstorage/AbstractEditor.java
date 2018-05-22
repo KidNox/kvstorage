@@ -33,7 +33,13 @@ public abstract class AbstractEditor<T extends AbstractEditor> {
         return put(encodeKey(key), value);
     }
 
+    public final T remove(String key) {
+        return remove(encodeKey(key));
+    }
+
     public abstract T put(byte[] key, byte[] value);
+
+    public abstract T remove(byte[] key);
 
     protected byte[] encodeKey(String key) {
         return ByteUtils.encodeString(key);

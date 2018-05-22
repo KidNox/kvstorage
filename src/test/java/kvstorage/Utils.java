@@ -20,16 +20,29 @@ public class Utils {
         return result;
     }
 
-    public static StreamWrapper brokenOutput() {
-        return new StreamWrapper() {
-            @Override public InputStream inputStream(InputStream is) throws IOException {
-                return is;
-            }
+    public static BrokenStreamWrapper brokenOutput() {
+        BrokenStreamWrapper streamWrapper = new BrokenStreamWrapper();
+        streamWrapper.brokenOutput = true;
+        return streamWrapper;
+    }
 
-            @Override public OutputStream outputStream(OutputStream os) throws IOException {
+    public static class BrokenStreamWrapper implements StreamWrapper {
+        boolean brokenInput;
+        boolean brokenOutput;
+
+        @Override public InputStream inputStream(InputStream is) throws IOException {
+            if (brokenInput) {
+                throw new IOException("brokenInputStream");
+            }
+            return is;
+        }
+
+        @Override public OutputStream outputStream(OutputStream os) throws IOException {
+            if (brokenOutput) {
                 throw new IOException("brokenOutputStream");
             }
-        };
+            return os;
+        }
     }
 
     public static ExceptionHandlerImpl createExceptionHandler() {

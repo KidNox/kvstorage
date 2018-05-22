@@ -74,6 +74,16 @@ public class KVStorageAdapterTest {
         assertArrayEquals(value, adapter.getBytes(key));
     }
 
+    @Test public void testRemove() {
+        adapter.put("key1", "value1");
+        adapter.remove("key1");
+        assertNull(adapter.getString("key1"));
+    }
+
+    @Test public void testRemoveEmpty() {
+        adapter.remove("key1");
+    }
+
     @Test public void testBulkInsert() {
         KVStorageAdapter.Editor editor = adapter.bulkInsert();
         editor.put("key1", true);
@@ -85,5 +95,26 @@ public class KVStorageAdapterTest {
         assertTrue(adapter.getBoolean("key1"));
         assertEquals(42, adapter.getInt("key2"));
         assertEquals("value3", adapter.getString("key3"));
+    }
+
+    @Test public void testBulkInsertAndRemove() {
+        adapter.bulkInsert()
+                .remove("null")
+                .put("key1", true)
+                .putInt("key2", 42)
+                .put("key3", "value3")
+                .commit();
+        assertTrue(adapter.getBoolean("key1"));
+        assertEquals(42, adapter.getInt("key2"));
+        assertEquals("value3", adapter.getString("key3"));
+
+        adapter.bulkInsert()
+                .remove("key1")
+                .remove("key2")
+                .put("key3", "value4")
+                .commit();
+        assertFalse(adapter.getBoolean("key1"));
+        assertEquals(0, adapter.getInt("key2"));
+        assertEquals("value4", adapter.getString("key3"));
     }
 }

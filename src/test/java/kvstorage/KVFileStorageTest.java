@@ -124,10 +124,24 @@ public class KVFileStorageTest {
         assertArrayEquals(value2, storage.get(key2));
     }
 
-    //TODO
-    /*@Test public void testNotCorruptBufferOnError() {
-
-    }*/
+    @Test public void testNotCorruptBufferOnError() throws IOException {
+        byte[] key1 = getRandomBytes(17);
+        byte[] value1 = getRandomBytes(23);
+        byte[] key2 = getRandomBytes(27);
+        byte[] value2 = getRandomBytes(37);
+        Utils.BrokenStreamWrapper streamWrapper = new Utils.BrokenStreamWrapper();
+        storage = new KVFileStorage(file, streamWrapper);
+        storage.put(key1, value1);
+        byte[] internalBuffer = Utils.getBuffer(storage);
+        streamWrapper.brokenOutput = true;
+        try {
+            storage.put(key2, value2);
+        } catch (Exception ignored) {
+        }
+        assertTrue(internalBuffer == Utils.getBuffer(storage));
+        assertNull(storage.get(key2));
+        assertArrayEquals(value1, storage.get(key1));
+    }
 
     @Test public void testExceptionHandler() {
         Utils.ExceptionHandlerImpl exceptionHandler = Utils.createExceptionHandler();

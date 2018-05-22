@@ -20,8 +20,7 @@ public class KVStorageImpl extends KVByteStorage {
         return initBuffer;
     }
 
-    @Override protected void writeNewBuffer(byte[] newBuffer) throws IOException {
-        super.writeNewBuffer(newBuffer);
+    @Override protected void writeBuffer(byte[] newBuffer) throws IOException {
         this.newBuffer = newBuffer;
     }
 }
