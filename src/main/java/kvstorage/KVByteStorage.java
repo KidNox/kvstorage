@@ -14,9 +14,15 @@ public abstract class KVByteStorage implements KVStorage {
 
     void ensureBufferInitialized() throws IOException {
         if (buffer == null) {
-            byte[] buffer = readBuffer();
-            readEntries(buffer);
-            this.buffer = buffer;
+            try {
+                byte[] buf = readBuffer();
+                readEntries(buf);
+                buffer = buf;
+            } finally {
+                if (buffer == null) {
+                    readEntries(buffer = new byte[0]);
+                }
+            }
         }
     }
 

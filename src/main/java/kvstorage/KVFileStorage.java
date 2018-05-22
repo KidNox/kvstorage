@@ -25,7 +25,7 @@ public class KVFileStorage extends KVByteStorage {
 
     @Override protected byte[] readBuffer() throws IOException {
         File backupFile = backupFile();
-        boolean success = false;
+        byte[] result = null;
         try {
             if (backupFile.exists()) {
                 deleteIfExists(file);
@@ -35,21 +35,23 @@ public class KVFileStorage extends KVByteStorage {
             }
             if (file.exists()) {
                 InputStream stream = streamWrapper.inputStream(new FileInputStream(file));
-                int size = stream.available();
-                byte[] buffer = new byte[size];
-                int read = stream.read(buffer);
-                if (size != read) {
-                    throw new IOException("can't read file " + size + " " + read);
+                try {
+                    int size = stream.available();
+                    byte[] temp = new byte[size];
+                    int read = stream.read(temp);
+                    if (size != read) {
+                        throw new IOException("can't read file " + size + " " + read);
+                    }
+                    result = temp;
+                } finally {
+                    closeQuietly(stream);
                 }
-                stream.close();
-                success = true;
-                return buffer;
             } else {
-                success = true;
-                return new byte[0];
+                result = new byte[0];
             }
+            return result;
         } finally {
-            if (!success) {
+            if (result == null) {
                 deleteIfExists(file);
                 deleteIfExists(backupFile);
             }
@@ -78,13 +80,18 @@ public class KVFileStorage extends KVByteStorage {
     private void writeBuffer(byte[] buffer, File out) throws IOException {
         FileOutputStream fos = new FileOutputStream(out);
         OutputStream stream = streamWrapper.outputStream(fos);
-        stream.write(buffer);
-        stream.flush();
+        try {
+            stream.write(buffer);
+            stream.flush();
+        } catch (Exception ex) {
+            closeQuietly(stream);
+            throw ex;
+        }
         try {
             fos.getFD().sync();
         } catch (Exception ignored) {
         } finally {
-            stream.close();
+            closeQuietly(stream);
         }
     }
 
@@ -100,5 +107,14 @@ public class KVFileStorage extends KVByteStorage {
 
     private static boolean deleteIfExists(File file) {
         return !file.exists() || file.delete();
+    }
+
+    private static void closeQuietly(Closeable closeable) {
+        if (closeable != null) {
+            try {
+                closeable.close();
+            } catch (IOException ignored) {
+            }
+        }
     }
 }
