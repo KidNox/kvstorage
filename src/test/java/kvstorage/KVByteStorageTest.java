@@ -7,10 +7,9 @@ import java.io.IOException;
 
 import static kvstorage.Utils.getRandomBytes;
 import static kvstorage.Utils.getRandomKV;
-import static org.junit.Assert.assertArrayEquals;
-import static org.junit.Assert.assertNull;
+import static org.junit.Assert.*;
 
-public class KVStorageTest {
+public class KVByteStorageTest {
     private KVStorageImpl kvStorage;
 
     @Before public void setUp() {
@@ -194,28 +193,75 @@ public class KVStorageTest {
     }
 
     @Test public void testKeyValues() throws IOException {
-        KVStorage.KeyValue[] keyValues = getRandomKV(10);
-        KVStorage.KeyValue tested = keyValues[7];
+        KVByteStorage.KeyValue[] keyValues = getRandomKV(10);
+        KVByteStorage.KeyValue tested = keyValues[7];
         kvStorage.put(keyValues);
         assertArrayEquals(tested.value, kvStorage.get(tested.key));
     }
 
     @Test public void testKeyValuesReplace() throws IOException {
-        KVStorage.KeyValue[] keyValues = getRandomKV(12);
-        KVStorage.KeyValue tested = keyValues[8];
-        KVStorage.KeyValue tested2 = keyValues[0];
-        KVStorage.KeyValue tested3 = keyValues[11];
+        KVByteStorage.KeyValue[] keyValues = getRandomKV(12);
+        KVByteStorage.KeyValue tested = keyValues[8];
+        KVByteStorage.KeyValue tested2 = keyValues[0];
+        KVByteStorage.KeyValue tested3 = keyValues[11];
         kvStorage.put(keyValues);
         assertArrayEquals(tested.value, kvStorage.get(tested.key));
         assertArrayEquals(tested2.value, kvStorage.get(tested2.key));
         keyValues = getRandomKV(5);
-        keyValues[0] = new KVStorage.KeyValue(tested.key, getRandomBytes(14));
-        keyValues[2] = new KVStorage.KeyValue(tested2.key, getRandomBytes(42));
-        keyValues[4] = new KVStorage.KeyValue(tested3.key, getRandomBytes(46));
+        keyValues[0] = new KVByteStorage.KeyValue(tested.key, getRandomBytes(14));
+        keyValues[2] = new KVByteStorage.KeyValue(tested2.key, getRandomBytes(42));
+        keyValues[4] = new KVByteStorage.KeyValue(tested3.key, getRandomBytes(46));
         kvStorage.put(keyValues);
         assertArrayEquals(keyValues[0].value, kvStorage.get(tested.key));
         assertArrayEquals(keyValues[2].value, kvStorage.get(tested2.key));
         assertArrayEquals(keyValues[4].value, kvStorage.get(tested3.key));
+    }
+
+    @Test public void testRemove() throws IOException {
+        byte[] key1 = getRandomBytes(11);
+        byte[] value1 = getRandomBytes(12);
+        kvStorage.put(key1, value1);
+        assertTrue(kvStorage.remove(key1));
+        assertNull(kvStorage.get(key1));
+        assertEquals(0, kvStorage.newBuffer.length);
+    }
+
+    @Test public void testRemoveEmpty() throws IOException {
+        byte[] key1 = getRandomBytes(11);
+        assertFalse(kvStorage.remove(key1));
+        assertNull(kvStorage.newBuffer);
+    }
+
+    @Test public void testRemoveTwice() throws IOException {
+        byte[] key1 = getRandomBytes(13);
+        byte[] value1 = getRandomBytes(14);
+        kvStorage.put(key1, value1);
+        assertTrue(kvStorage.remove(key1));
+        assertFalse(kvStorage.remove(key1));
+        assertNull(kvStorage.get(key1));
+        assertEquals(0, kvStorage.newBuffer.length);
+    }
+
+    @Test public void testRemove2() throws IOException {
+        byte[] key1 = getRandomBytes(5);
+        byte[] value1 = getRandomBytes(7);
+        byte[] key2 = getRandomBytes(11);
+        byte[] value2 = getRandomBytes(13);
+        byte[] key3 = getRandomBytes(6);
+        byte[] value3 = getRandomBytes(8);
+        byte[] key4 = getRandomBytes(9);
+        byte[] value4 = getRandomBytes(12);
+        kvStorage.put(key1, value1);
+        kvStorage.put(key2, value2);
+        kvStorage.put(key3, value3);
+        kvStorage.put(key4, value4);
+        assertTrue(kvStorage.remove(key1));
+        assertNull(kvStorage.get(key1));
+        assertArrayEquals(value2, kvStorage.get(key2));
+        assertArrayEquals(value3, kvStorage.get(key3));
+        assertArrayEquals(value4, kvStorage.get(key4));
+        assertTrue(kvStorage.remove(key4));
+        assertNull(kvStorage.get(key4));
     }
 
     @Test public void testClear() throws IOException {
@@ -257,18 +303,18 @@ public class KVStorageTest {
     }
 
     @Test public void testInitNonEmptyBuffer3() throws IOException {
-        KVStorage.KeyValue[] keyValues = getRandomKV(12);
-        KVStorage.KeyValue tested = keyValues[8];
-        KVStorage.KeyValue tested2 = keyValues[0];
-        KVStorage.KeyValue tested3 = keyValues[11];
+        KVByteStorage.KeyValue[] keyValues = getRandomKV(12);
+        KVByteStorage.KeyValue tested = keyValues[8];
+        KVByteStorage.KeyValue tested2 = keyValues[0];
+        KVByteStorage.KeyValue tested3 = keyValues[11];
         kvStorage.put(keyValues);
         kvStorage = new KVStorageImpl(kvStorage.newBuffer);
         assertArrayEquals(tested.value, kvStorage.get(tested.key));
         assertArrayEquals(tested2.value, kvStorage.get(tested2.key));
         keyValues = getRandomKV(5);
-        keyValues[0] = new KVStorage.KeyValue(tested.key, getRandomBytes(14));
-        keyValues[2] = new KVStorage.KeyValue(tested2.key, getRandomBytes(42));
-        keyValues[4] = new KVStorage.KeyValue(tested3.key, getRandomBytes(46));
+        keyValues[0] = new KVByteStorage.KeyValue(tested.key, getRandomBytes(14));
+        keyValues[2] = new KVByteStorage.KeyValue(tested2.key, getRandomBytes(42));
+        keyValues[4] = new KVByteStorage.KeyValue(tested3.key, getRandomBytes(46));
         kvStorage.put(keyValues);
         kvStorage = new KVStorageImpl(kvStorage.newBuffer);
         assertArrayEquals(keyValues[0].value, kvStorage.get(tested.key));

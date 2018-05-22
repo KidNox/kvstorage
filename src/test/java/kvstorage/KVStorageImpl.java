@@ -2,7 +2,7 @@ package kvstorage;
 
 import java.io.IOException;
 
-public class KVStorageImpl extends KVStorage {
+public class KVStorageImpl extends KVByteStorage {
 
     private final byte[] initBuffer;
 

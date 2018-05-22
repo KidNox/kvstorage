@@ -2,7 +2,7 @@ package kvstorage;
 
 import java.io.*;
 
-public class KVFileStorage extends KVStorage {
+public class KVFileStorage extends KVByteStorage {
     private final File file;
     private final StreamWrapper streamWrapper;
 
