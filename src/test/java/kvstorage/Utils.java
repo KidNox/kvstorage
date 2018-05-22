@@ -19,13 +19,13 @@ public class Utils {
         return result;
     }
 
-    public static StreamFactory brokenOutput() {
-        return new StreamFactory() {
-            @Override public InputStream inputStream(File file) throws IOException {
-                return new FileInputStream(file);
+    public static StreamWrapper brokenOutput() {
+        return new StreamWrapper() {
+            @Override public InputStream inputStream(InputStream is) throws IOException {
+                return is;
             }
 
-            @Override public OutputStream outputStream(File file) throws IOException {
+            @Override public OutputStream outputStream(OutputStream os) throws IOException {
                 throw new IOException("brokenOutputStream");
             }
         };

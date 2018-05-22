@@ -4,23 +4,23 @@ import java.io.*;
 
 public class KVFileStorage extends KVStorage {
     private final File file;
-    private final StreamFactory streamFactory;
+    private final StreamWrapper streamWrapper;
 
     public KVFileStorage(File file) {
-        this(file, new StreamFactory() {
-            @Override public InputStream inputStream(File file) throws IOException {
-                return new FileInputStream(file);
+        this(file, new StreamWrapper() {
+            @Override public InputStream inputStream(InputStream is) throws IOException {
+                return is;
             }
 
-            @Override public OutputStream outputStream(File file) throws IOException {
-                return new FileOutputStream(file);
+            @Override public OutputStream outputStream(OutputStream os) throws IOException {
+                return os;
             }
         });
     }
 
-    public KVFileStorage(File file, StreamFactory streamFactory) {
+    public KVFileStorage(File file, StreamWrapper streamWrapper) {
         this.file = file;
-        this.streamFactory = streamFactory;
+        this.streamWrapper = streamWrapper;
     }
 
     @Override protected byte[] readBuffer() throws IOException {
@@ -32,7 +32,7 @@ public class KVFileStorage extends KVStorage {
             }
         }
         if (file.exists()) {
-            InputStream stream = streamFactory.inputStream(file);
+            InputStream stream = streamWrapper.inputStream(new FileInputStream(file));
             int size = stream.available();
             byte[] buffer = new byte[size];
             int read = stream.read(buffer);
@@ -67,9 +67,16 @@ public class KVFileStorage extends KVStorage {
     }
 
     private void writeBuffer(byte[] buffer, File out) throws IOException {
-        OutputStream stream = streamFactory.outputStream(out);
+        FileOutputStream fos = new FileOutputStream(out);
+        OutputStream stream = streamWrapper.outputStream(fos);
         stream.write(buffer);
-        stream.close();
+        stream.flush();
+        try {
+            fos.getFD().sync();
+        } catch (Exception ignored) {
+        } finally {
+            stream.close();
+        }
     }
 
     private File backupFile() {
