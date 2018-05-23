@@ -112,6 +112,15 @@ public class KVStorageAdapter extends AbstractEditor {
         return this;
     }
 
+    public final AbstractEditor clear() {
+        try {
+            storage.clear();
+        } catch (IOException e) {
+            exceptionHandler.handleException(e);
+        }
+        return this;
+    }
+
     public final Editor bulkInsert() {
         return new Editor();
     }
