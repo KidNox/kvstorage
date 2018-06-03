@@ -3,6 +3,7 @@ package kvstorage;
 import java.io.IOException;
 
 public interface KVStorage {
+    
     void loadToBuffer() throws IOException;
 
     byte[] get(byte[] key) throws IOException;
@@ -14,6 +15,8 @@ public interface KVStorage {
     boolean remove(byte[] key) throws IOException;
 
     void clear() throws IOException;
+    
+    byte[] snapshot() throws IOException;
 
     final class KeyValue {
         final byte[] key;

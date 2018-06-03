@@ -96,6 +96,4 @@ final class ByteEntry {
         entry.value = value;
         return entry;
     }
-
-
 }

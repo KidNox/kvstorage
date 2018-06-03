@@ -321,4 +321,19 @@ public class KVByteStorageTest {
         assertArrayEquals(keyValues[2].value, kvStorage.get(tested2.key));
         assertArrayEquals(keyValues[4].value, kvStorage.get(tested3.key));
     }
+
+    @Test public void testEmptySnapshot() throws IOException {
+        assertArrayEquals(new byte[0], kvStorage.snapshot());
+    }
+
+    @Test public void testSnapshot() throws IOException {
+        byte[] key1 = getRandomBytes(3);
+        byte[] value1 = getRandomBytes(4);
+        kvStorage.put(key1, value1);
+        KVStorage snapshot = new KVStorageImpl(kvStorage.snapshot());
+        assertArrayEquals(value1, snapshot.get(key1));
+        kvStorage.put(new byte[]{2}, new byte[]{3});
+        assertArrayEquals(new byte[]{3}, kvStorage.get(new byte[]{2}));
+        assertNull(snapshot.get(new byte[]{2}));
+    }
 }

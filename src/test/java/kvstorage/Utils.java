@@ -30,14 +30,14 @@ public class Utils {
         boolean brokenInput;
         boolean brokenOutput;
 
-        @Override public InputStream inputStream(InputStream is) throws IOException {
+        @Override public InputStream input(InputStream is) throws IOException {
             if (brokenInput) {
                 throw new IOException("brokenInputStream");
             }
             return is;
         }
 
-        @Override public OutputStream outputStream(OutputStream os) throws IOException {
+        @Override public OutputStream output(OutputStream os) throws IOException {
             if (brokenOutput) {
                 throw new IOException("brokenOutputStream");
             }

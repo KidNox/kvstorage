@@ -12,6 +12,10 @@ public abstract class KVByteStorage implements KVStorage {
 
     private byte[] buffer;
 
+    protected abstract byte[] readBuffer() throws IOException;
+
+    protected abstract void writeBuffer(byte[] newBuffer) throws IOException;
+
     void ensureBufferInitialized() throws IOException {
         if (buffer == null) {
             try {
@@ -25,10 +29,6 @@ public abstract class KVByteStorage implements KVStorage {
             }
         }
     }
-
-    protected abstract byte[] readBuffer() throws IOException;
-
-    protected abstract void writeBuffer(byte[] newBuffer) throws IOException;
 
     private void readEntries(byte[] buffer) throws IOException {
         entries.clear();
@@ -65,18 +65,36 @@ public abstract class KVByteStorage implements KVStorage {
 
     @Override public void put(byte[] key, byte[] value) throws IOException {
         ensureBufferInitialized();
-        byte[] tempBuffer = writeToBuffer(key, value, buffer);
-        writeNewBufferInternal(tempBuffer);
+        byte[] newBuff = writeToBuffer(key, value, buffer);
+        writeNewBufferInternal(newBuff);
     }
 
     @Override public boolean remove(byte[] key) throws IOException {
         ensureBufferInitialized();
-        byte[] tempBuffer = writeToBuffer(key, null, buffer);
-        if (buffer != tempBuffer) {
-            writeNewBufferInternal(tempBuffer);
+        byte[] newBuff = writeToBuffer(key, null, buffer);
+        if (buffer != newBuff) {
+            writeNewBufferInternal(newBuff);
             return true;
         }
         return false;
+    }
+
+    @Override public byte[] get(byte[] key) throws IOException {
+        ensureBufferInitialized();
+        long hash = hash(key);
+        ByteEntry entry = find(key, hash, buffer);
+        if (entry == null) return null;
+        return entry.getOrReadValue(buffer);
+    }
+
+    @Override public void clear() throws IOException {
+        entries.clear();
+        writeNewBufferInternal(new byte[0]);
+    }
+
+    @Override public byte[] snapshot() throws IOException {
+        ensureBufferInitialized();
+        return subArray(buffer, 0, buffer.length);
     }
 
     private byte[] writeToBuffer(byte[] key, byte[] value, byte[] buffer) {
@@ -95,19 +113,6 @@ public abstract class KVByteStorage implements KVStorage {
             if (value == null) return buffer;
             return addEntry(key, hash, value, buffer);
         }
-    }
-
-    @Override public byte[] get(byte[] key) throws IOException {
-        ensureBufferInitialized();
-        long hash = hash(key);
-        ByteEntry entry = find(key, hash, buffer);
-        if (entry == null) return null;
-        return entry.getOrReadValue(buffer);
-    }
-
-    @Override public void clear() throws IOException {
-        entries.clear();
-        writeNewBufferInternal(new byte[0]);
     }
 
     private void writeNewBufferInternal(byte[] newBuffer) throws IOException {
@@ -137,31 +142,31 @@ public abstract class KVByteStorage implements KVStorage {
 
     private byte[] addEntry(byte[] key, long hash, byte[] value, byte[] buffer) {
         ByteEntry byteEntry = new ByteEntry(buffer.length, hash, key.length, value.length);
-        byte[] tempBuffer = new byte[byteEntry.nextPosition()];
-        fill(buffer, tempBuffer, 0);
-        int keyPos = byteEntry.write(byteEntry.position, tempBuffer);
-        fill(key, tempBuffer, keyPos);
-        fill(value, tempBuffer, byteEntry.valuePosition());
+        byte[] newBuff = new byte[byteEntry.nextPosition()];
+        fill(buffer, newBuff, 0);
+        int keyPos = byteEntry.write(byteEntry.position, newBuff);
+        fill(key, newBuff, keyPos);
+        fill(value, newBuff, byteEntry.valuePosition());
         entries.add(byteEntry);
-        return tempBuffer;
+        return newBuff;
     }
 
     private byte[] replaceEntry(ByteEntry current, byte[] value, byte[] buffer) {
-        byte[] tempBuffer;
+        byte[] newBuff;
         if (current.valueLength == value.length) {
-            tempBuffer = new byte[buffer.length];
-            copy(buffer, 0, tempBuffer);
-            fill(value, tempBuffer, current.valuePosition());
+            newBuff = new byte[buffer.length];
+            copy(buffer, 0, newBuff);
+            fill(value, newBuff, current.valuePosition());
             current.setValue(value);
         } else {
-            tempBuffer = new byte[buffer.length - current.valueLength + value.length];
-            copy(buffer, 0, tempBuffer, 0, current.valuePosition());
+            newBuff = new byte[buffer.length - current.valueLength + value.length];
+            copy(buffer, 0, newBuff, 0, current.valuePosition());
             ByteEntry newEntry = current.copyWithNewValue(value);
-            newEntry.write(current.position, tempBuffer);
-            fill(value, tempBuffer, current.valuePosition());
+            newEntry.write(current.position, newBuff);
+            fill(value, newBuff, current.valuePosition());
             if (current.getIndex() < entries.size() - 1) {
                 int destPos = current.valuePosition() + value.length;
-                copy(buffer, current.nextPosition(), tempBuffer, destPos, tempBuffer.length - destPos);
+                copy(buffer, current.nextPosition(), newBuff, destPos, newBuff.length - destPos);
                 ListIterator<ByteEntry> iterator = entries.listIterator(current.getIndex());
                 ByteEntry previous = current;
                 while (iterator.hasNext()) {
@@ -176,16 +181,16 @@ public abstract class KVByteStorage implements KVStorage {
                 entries.set(current.getIndex(), newEntry);
             }
         }
-        return tempBuffer;
+        return newBuff;
     }
 
     private byte[] removeEntry(ByteEntry current, byte[] buffer) {
-        byte[] tempBuffer = new byte[buffer.length - current.entryLength()];
+        byte[] newBuff = new byte[buffer.length - current.entryLength()];
         if (current.position > 0) {
-            copy(buffer, 0, tempBuffer, 0, current.position);
+            copy(buffer, 0, newBuff, 0, current.position);
         }
         if (current.nextPosition() < buffer.length) {
-            copy(buffer, current.nextPosition(), tempBuffer, current.position, buffer.length - current.nextPosition());
+            copy(buffer, current.nextPosition(), newBuff, current.position, buffer.length - current.nextPosition());
         }
         entries.remove(current.getIndex());
         if (entries.size() > current.getIndex()) {
@@ -200,6 +205,6 @@ public abstract class KVByteStorage implements KVStorage {
                 }
             }
         }
-        return tempBuffer;
+        return newBuff;
     }
 }

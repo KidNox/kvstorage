@@ -31,6 +31,17 @@ public class KVStorageAdapter extends AbstractEditor {
         return false;
     }
 
+    public final KVStorageAdapter snapshot() {
+        byte[] snapshot;
+        try {
+            snapshot = storage.snapshot();
+        } catch (IOException e) {
+            exceptionHandler.handleException(e);
+            snapshot = new byte[0];
+        }
+        return new KVStorageAdapter(new StorageSnapshot(snapshot), exceptionHandler);
+    }
+
     public final boolean getBoolean(String key) {
         return getBoolean(key, false);
     }

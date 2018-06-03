@@ -117,4 +117,17 @@ public class KVStorageAdapterTest {
         assertEquals(0, adapter.getInt("key2"));
         assertEquals("value4", adapter.getString("key3"));
     }
+
+    @Test public void testEmptySnapshot() {
+        assertFalse(adapter.snapshot().getBoolean("empty"));
+    }
+
+    @Test public void testSnapshot() {
+        adapter.put("key1", "value1");
+        KVStorageAdapter snapshot = adapter.snapshot();
+        assertEquals("value1", snapshot.getString("key1"));
+        adapter.put("key1", "value2");
+        assertEquals("value1", snapshot.getString("key1"));
+        assertEquals("value2", adapter.snapshot().getString("key1"));
+    }
 }
