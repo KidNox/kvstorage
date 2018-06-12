@@ -24,15 +24,8 @@ public class KVFileStorage extends KVByteStorage {
     }
 
     @Override protected byte[] readBuffer() throws IOException {
-        File backupFile = backupFile();
         byte[] result = null;
         try {
-            if (backupFile.exists()) {
-                deleteIfExists(file);
-                if (!backupFile.renameTo(file)) {
-                    throw new IOException("can't restore from backup");
-                }
-            }
             if (file.exists()) {
                 InputStream stream = streamWrapper.input(new FileInputStream(file));
                 try {
@@ -40,7 +33,7 @@ public class KVFileStorage extends KVByteStorage {
                     byte[] temp = new byte[size];
                     int read = stream.read(temp);
                     if (size != read) {
-                        throw new IOException("can't read file " + size + " " + read);
+                        throw new IOException("readBuffer failed " + size + " " + read);
                     }
                     result = temp;
                 } finally {
@@ -52,28 +45,24 @@ public class KVFileStorage extends KVByteStorage {
             return result;
         } finally {
             if (result == null) {
-                deleteIfExists(file);
-                deleteIfExists(backupFile);
+                file.delete();
             }
         }
     }
 
     @Override protected void writeBuffer(byte[] newBuffer) throws IOException {
-        File backupFile = backupFile();
-        if (!backupFile.exists()) {////else use current backup file
-            if (file.exists() && !file.renameTo(backupFile)) {
-                throw new IOException("can't create backup");
-            }
-        }
-        if (!file.exists() && !file.createNewFile()) {
-            throw new IOException("can't create new file");
-        }
+        File tmpFile = tempFile();
+        boolean success;
         try {
-            writeBuffer(newBuffer, file);
-            deleteIfExists(backupFile);
+            writeBuffer(newBuffer, tmpFile);
+            success = tmpFile.renameTo(file);
         } catch (IOException ex) {
-            deleteIfExists(file);//restore from backup next time
-            throw ex;
+            throw new IOException("writeBuffer " + newBuffer.length, ex);
+        } finally {
+            tmpFile.delete();
+        }
+        if(!success) {
+            throw new IOException("writeBuffer failed" + newBuffer.length);
         }
     }
 
@@ -95,18 +84,8 @@ public class KVFileStorage extends KVByteStorage {
         }
     }
 
-    private File backupFile() {
-        File parentDir = file.getParentFile();
-        String backupName = file.getName() + ".b";
-        if (parentDir != null) {
-            return new File(parentDir, backupName);
-        } else {
-            return new File(backupName);
-        }
-    }
-
-    private static boolean deleteIfExists(File file) {
-        return !file.exists() || file.delete();
+    protected File tempFile() throws IOException {
+        return File.createTempFile(file.getName(), ".t", file.getParentFile());
     }
 
     private static void closeQuietly(Closeable closeable) {
