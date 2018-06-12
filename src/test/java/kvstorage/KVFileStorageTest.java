@@ -96,6 +96,25 @@ public class KVFileStorageTest {
     }
 
     @Test public void testBrokenOutput2() throws IOException {
+        storage = new KVFileStorage(file, Utils.brokenOutput(64));
+        byte[] key1 = getRandomBytes(16);
+        byte[] value1 = getRandomBytes(16);
+        byte[] key2 = getRandomBytes(32);
+        byte[] value2 = getRandomBytes(32);
+        storage.put(key1, value1);
+        try {
+            storage.put(key2, value2);
+            fail();
+        } catch (IOException ignored) {//expected
+        }
+        storage = new KVFileStorage(file);//must restore from backup
+        assertArrayEquals(value1, storage.get(key1));
+        assertNull(storage.get(key2));
+        storage.put(key2, value2);
+        assertArrayEquals(value2, storage.get(key2));
+    }
+
+    @Test public void testBrokenOutput3() throws IOException {
         byte[] key1 = getRandomBytes(16);
         byte[] value1 = getRandomBytes(128);
         byte[] key2 = getRandomBytes(33);

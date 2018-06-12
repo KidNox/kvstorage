@@ -26,6 +26,23 @@ public class Utils {
         return streamWrapper;
     }
 
+    public static StreamWrapper brokenOutput(int passBytes) {
+        return new BrokenStreamWrapper() {
+            @Override public OutputStream output(OutputStream os) throws IOException {
+                return new BufferedOutputStream(os) {
+                    @Override public synchronized void write(byte[] b, int off, int len) throws IOException {
+                        if (b.length > passBytes) {
+                            super.write(ByteUtils.subArray(b, 0, passBytes), off, passBytes);
+                            throw new IOException("brokenOutputStream " + passBytes);
+                        } else {
+                            super.write(b, off, len);
+                        }
+                    }
+                };
+            }
+        };
+    }
+
     public static class BrokenStreamWrapper implements StreamWrapper {
         boolean brokenInput;
         boolean brokenOutput;
