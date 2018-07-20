@@ -16,12 +16,12 @@ public class KVFileStorageTest {
     @Rule public TemporaryFolder folder = new TemporaryFolder();
 
     private File file;
-    private KVByteStorage storage;
+    private KVStorage storage;
 
     @Before public void setUp() throws Exception {
         File parent = folder.getRoot();
         file = new File(parent, "storage");
-        storage = new KVFileStorage(file);
+        storage = newStorage(file);
     }
 
     @Test public void testInitNonEmptyFile() throws IOException {
@@ -32,7 +32,7 @@ public class KVFileStorageTest {
         storage.put(key1, value1);
         storage.put(key2, value2);
 
-        storage = new KVFileStorage(file);
+        storage = newStorage(file);
         assertArrayEquals(value1, storage.get(key1));
         assertArrayEquals(value2, storage.get(key2));
     }
@@ -46,11 +46,11 @@ public class KVFileStorageTest {
         byte[] value3 = getRandomBytes(99);
         storage.put(key1, value1);
         storage.put(key2, value2);
-        storage = new KVFileStorage(file);
+        storage = newStorage(file);
         assertArrayEquals(value1, storage.get(key1));
         assertArrayEquals(value2, storage.get(key2));
         storage.put(key3, value3);
-        storage = new KVFileStorage(file);
+        storage = newStorage(file);
         assertArrayEquals(value1, storage.get(key1));
         assertArrayEquals(value2, storage.get(key2));
         assertArrayEquals(value3, storage.get(key3));
@@ -62,7 +62,7 @@ public class KVFileStorageTest {
         KVByteStorage.KeyValue tested2 = keyValues[0];
         KVByteStorage.KeyValue tested3 = keyValues[11];
         storage.put(keyValues);
-        storage = new KVFileStorage(file);
+        storage = newStorage(file);
         assertArrayEquals(tested.value, storage.get(tested.key));
         assertArrayEquals(tested2.value, storage.get(tested2.key));
         keyValues = getRandomKV(5);
@@ -70,7 +70,7 @@ public class KVFileStorageTest {
         keyValues[2] = new KVByteStorage.KeyValue(tested2.key, getRandomBytes(42));
         keyValues[4] = new KVByteStorage.KeyValue(tested3.key, getRandomBytes(46));
         storage.put(keyValues);
-        storage = new KVFileStorage(file);
+        storage = newStorage(file);
         assertArrayEquals(keyValues[0].value, storage.get(tested.key));
         assertArrayEquals(keyValues[2].value, storage.get(tested2.key));
         assertArrayEquals(keyValues[4].value, storage.get(tested3.key));
@@ -82,13 +82,13 @@ public class KVFileStorageTest {
         byte[] key2 = getRandomBytes(33);
         byte[] value2 = getRandomBytes(99);
         storage.put(key1, value1);
-        storage = new KVFileStorage(file, Utils.brokenOutput());
+        storage = newStorage(file, Utils.brokenOutput());
         try {
             storage.put(key2, value2);
             fail();
         } catch (IOException ignored) {//expected
         }
-        storage = new KVFileStorage(file);//must restore from backup
+        storage = newStorage(file);//must restore from backup
         assertArrayEquals(value1, storage.get(key1));
         assertNull(storage.get(key2));
         storage.put(key2, value2);
@@ -96,7 +96,7 @@ public class KVFileStorageTest {
     }
 
     @Test public void testBrokenOutput2() throws IOException {
-        storage = new KVFileStorage(file, Utils.brokenOutput(64));
+        storage = newStorage(file, Utils.brokenOutput(64));
         byte[] key1 = getRandomBytes(16);
         byte[] value1 = getRandomBytes(16);
         byte[] key2 = getRandomBytes(32);
@@ -107,7 +107,7 @@ public class KVFileStorageTest {
             fail();
         } catch (IOException ignored) {//expected
         }
-        storage = new KVFileStorage(file);//must restore from backup
+        storage = newStorage(file);//must restore from backup
         assertArrayEquals(value1, storage.get(key1));
         assertNull(storage.get(key2));
         storage.put(key2, value2);
@@ -120,50 +120,32 @@ public class KVFileStorageTest {
         byte[] key2 = getRandomBytes(33);
         byte[] value2 = getRandomBytes(42);
         storage.put(key1, value1);
-        storage = new KVFileStorage(file, Utils.brokenOutput());
+        storage = newStorage(file, Utils.brokenOutput());
         try {
             storage.put(key2, getRandomBytes(66));
             fail();
         } catch (IOException ignored) {//expected
         }
-        storage = new KVFileStorage(file);//must restore from backup
+        storage = newStorage(file);//must restore from backup
         assertArrayEquals(value1, storage.get(key1));
         assertNull(storage.get(key2));
-        storage = new KVFileStorage(file, Utils.brokenOutput());//check backup on permanent fail
+        storage = newStorage(file, Utils.brokenOutput());//check backup on permanent fail
         try {
             storage.put(key2, getRandomBytes(66));
             fail();
         } catch (IOException ignored) {//expected
         }
-        storage = new KVFileStorage(file);//must restore from backup
+        storage = newStorage(file);//must restore from backup
         assertArrayEquals(value1, storage.get(key1));
         storage.put(key2, value2);
-        storage = new KVFileStorage(file);
+        storage = newStorage(file);
         assertArrayEquals(value1, storage.get(key1));
         assertArrayEquals(value2, storage.get(key2));
     }
 
-    @Test public void testCanUseBufferOnBrokenInput() throws IOException {
-        storage.put(getRandomBytes(11), getRandomBytes(9));
-        Utils.BrokenStreamWrapper streamWrapper = new Utils.BrokenStreamWrapper();
-        storage = new KVFileStorage(file, streamWrapper);
-        streamWrapper.brokenInput = true;
-        byte[] key1 = getRandomBytes(9);
-        byte[] value1 = getRandomBytes(5);
-        try {
-            storage.loadToBuffer();
-            fail();
-        } catch (Exception ignored) {
-        }
-        storage.put(key1, value1);
-        assertArrayEquals(value1, storage.get(key1));
-        storage = new KVFileStorage(file);
-        assertArrayEquals(value1, storage.get(key1));
-    }
-
     @Test public void testNotCorruptBufferOnError() throws IOException {
         Utils.BrokenStreamWrapper streamWrapper = new Utils.BrokenStreamWrapper();
-        storage = new KVFileStorage(file, streamWrapper);
+        storage = newStorage(file, streamWrapper);
         byte[] key1 = getRandomBytes(17);
         byte[] value1 = getRandomBytes(23);
         byte[] key2 = getRandomBytes(27);
@@ -181,11 +163,19 @@ public class KVFileStorageTest {
         assertArrayEquals(value1, storage.get(key1));
     }
 
-    @Test public void testExceptionHandler() {
+    @Test public void testExceptionHandler() throws IOException {
         Utils.ExceptionHandlerImpl exceptionHandler = Utils.createExceptionHandler();
-        KVStorageAdapter adapter = new KVStorageAdapter(storage = new KVFileStorage(file, Utils.brokenOutput()), exceptionHandler);
+        KVStorageAdapter adapter = new KVStorageAdapter(storage = newStorage(file, Utils.brokenOutput()), exceptionHandler);
         adapter.put("a", "b");
         assertNotNull(exceptionHandler.exception);
         assertEquals(0, Utils.getBuffer(storage).length);
+    }
+
+    private static KVStorage newStorage(File file) throws IOException {
+        return new ByteFileStorage(file).createStorage();
+    }
+
+    private static KVStorage newStorage(File file, StreamWrapper streamWrapper) throws IOException {
+        return new ByteFileStorage(file, false, streamWrapper).createStorage();
     }
 }

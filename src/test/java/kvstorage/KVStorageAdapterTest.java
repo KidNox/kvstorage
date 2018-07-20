@@ -3,12 +3,14 @@ package kvstorage;
 import org.junit.Before;
 import org.junit.Test;
 
+import java.io.IOException;
+
 import static org.junit.Assert.*;
 
 public class KVStorageAdapterTest {
     private KVStorageAdapter adapter;
 
-    @Before public void setUp() {
+    @Before public void setUp() throws IOException {
         adapter = new KVStorageAdapter(new KVStorageImpl());
     }
 
@@ -85,7 +87,7 @@ public class KVStorageAdapterTest {
     }
 
     @Test public void testBulkInsert() {
-        KVStorageAdapter.Editor editor = adapter.bulkInsert();
+        KVStorageAdapter.BulkEditor editor = adapter.bulkInsert();
         editor.put("key1", true);
         assertFalse(adapter.getBoolean("key1"));
         editor.putInt("key2", 42);

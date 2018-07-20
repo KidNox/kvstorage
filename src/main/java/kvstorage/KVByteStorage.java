@@ -7,27 +7,17 @@ import java.util.ListIterator;
 
 import static kvstorage.ByteUtils.*;
 
-public abstract class KVByteStorage implements KVStorage {
+public final class KVByteStorage implements KVStorage {
     private final List<ByteEntry> entries = new ArrayList<>();
 
+    private final ByteStorage byteStorage;
     private byte[] buffer;
 
-    protected abstract byte[] readBuffer() throws IOException;
-
-    protected abstract void writeBuffer(byte[] newBuffer) throws IOException;
-
-    void ensureBufferInitialized() throws IOException {
-        if (buffer == null) {
-            try {
-                byte[] buf = readBuffer();
-                readEntries(buf);
-                buffer = buf;
-            } finally {
-                if (buffer == null) {
-                    readEntries(buffer = new byte[0]);
-                }
-            }
-        }
+    public KVByteStorage(ByteStorage byteStorage) throws IOException {
+        this.byteStorage = byteStorage;
+        byte[] buffer = byteStorage.read();
+        readEntries(buffer);
+        this.buffer = buffer;
     }
 
     private void readEntries(byte[] buffer) throws IOException {
@@ -49,29 +39,41 @@ public abstract class KVByteStorage implements KVStorage {
         }
     }
 
-    @Override public void loadToBuffer() throws IOException {
-        ensureBufferInitialized();
+    @Override public byte[] get(byte[] key) {
+        long hash = hash(key);
+        synchronized (this) {
+            ByteEntry entry = find(key, hash, buffer);
+            if (entry == null) return null;
+            return entry.getOrReadValue(buffer);
+        }
+    }
+
+    @Override public synchronized byte[] snapshot() {
+        return subArray(buffer, 0, buffer.length);
     }
 
     @Override public void put(KeyValue... keyValues) throws IOException {
         if (keyValues.length == 0) return;
-        ensureBufferInitialized();
-        byte[] currentBuffer = buffer;
-        for (KeyValue kv : keyValues) {
-            currentBuffer = writeToBuffer(kv.key, kv.value, currentBuffer);
+        byte[] currentBuffer;
+        synchronized (this) {
+            currentBuffer = buffer;
+            for (KeyValue kv : keyValues) {
+                currentBuffer = writeToBuffer(kv.key, kv.value, currentBuffer);
+            }
         }
         writeNewBufferInternal(currentBuffer);
     }
 
     @Override public void put(byte[] key, byte[] value) throws IOException {
-        ensureBufferInitialized();
         byte[] newBuff = writeToBuffer(key, value, buffer);
         writeNewBufferInternal(newBuff);
     }
 
     @Override public boolean remove(byte[] key) throws IOException {
-        ensureBufferInitialized();
-        byte[] newBuff = writeToBuffer(key, null, buffer);
+        byte[] newBuff;
+        synchronized (this) {
+            newBuff = writeToBuffer(key, null, buffer);
+        }
         if (buffer != newBuff) {
             writeNewBufferInternal(newBuff);
             return true;
@@ -79,22 +81,11 @@ public abstract class KVByteStorage implements KVStorage {
         return false;
     }
 
-    @Override public byte[] get(byte[] key) throws IOException {
-        ensureBufferInitialized();
-        long hash = hash(key);
-        ByteEntry entry = find(key, hash, buffer);
-        if (entry == null) return null;
-        return entry.getOrReadValue(buffer);
-    }
-
     @Override public void clear() throws IOException {
-        entries.clear();
+        synchronized (this) {
+            entries.clear();
+        }
         writeNewBufferInternal(new byte[0]);
-    }
-
-    @Override public byte[] snapshot() throws IOException {
-        ensureBufferInitialized();
-        return subArray(buffer, 0, buffer.length);
     }
 
     private byte[] writeToBuffer(byte[] key, byte[] value, byte[] buffer) {
@@ -116,13 +107,15 @@ public abstract class KVByteStorage implements KVStorage {
     }
 
     private void writeNewBufferInternal(byte[] newBuffer) throws IOException {
+        byte[] current = buffer;
         try {
-            writeBuffer(newBuffer);
+            byteStorage.write(newBuffer);
             buffer = newBuffer;
-        } finally {
-            if (buffer != newBuffer) {
-                readEntries(buffer);
+        } catch (Exception ex) {
+            synchronized (this) {
+                readEntries(current);
             }
+            throw ex;
         }
     }
 

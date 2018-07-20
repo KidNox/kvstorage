@@ -4,7 +4,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
-public class KVStorageAdapter extends AbstractEditor {
+public class KVStorageAdapter extends Editor {
     private final KVStorage storage;
     private final ExceptionHandler exceptionHandler;
 
@@ -21,25 +21,14 @@ public class KVStorageAdapter extends AbstractEditor {
         this.exceptionHandler = exceptionHandler;
     }
 
-    public final boolean preload() {
-        try {
-            storage.loadToBuffer();
-            return true;
-        } catch (IOException e) {
-            exceptionHandler.handleException(e);
-        }
-        return false;
-    }
-
     public final KVStorageAdapter snapshot() {
-        byte[] snapshot;
         try {
-            snapshot = storage.snapshot();
-        } catch (IOException e) {
-            exceptionHandler.handleException(e);
-            snapshot = new byte[0];
+            KVStorage storage = new KVByteStorage(new ByteStorage.StorageSnapshot(this.storage.snapshot()));
+            return new KVStorageAdapter(storage);
+        } catch (Exception ex) {
+            exceptionHandler.handleException(ex);
+            throw new IllegalStateException("corrupted snapshot", ex);
         }
-        return new KVStorageAdapter(new StorageSnapshot(snapshot), exceptionHandler);
     }
 
     public final boolean getBoolean(String key) {
@@ -99,52 +88,52 @@ public class KVStorageAdapter extends AbstractEditor {
     private byte[] getValueSafe(byte[] key) {
         try {
             return storage.get(key);
-        } catch (IOException e) {
+        } catch (Exception e) {
             exceptionHandler.handleException(e);
         }
         return null;
     }
 
-    @Override public AbstractEditor put(byte[] key, byte[] value) {
+    @Override public Editor put(byte[] key, byte[] value) {
         try {
             storage.put(key, value);
-        } catch (IOException e) {
+        } catch (Exception e) {
             exceptionHandler.handleException(e);
         }
         return this;
     }
 
-    @Override public AbstractEditor remove(byte[] key) {
+    @Override public Editor remove(byte[] key) {
         try {
             storage.remove(key);
-        } catch (IOException e) {
+        } catch (Exception e) {
             exceptionHandler.handleException(e);
         }
         return this;
     }
 
-    public final AbstractEditor clear() {
+    public final Editor clear() {
         try {
             storage.clear();
-        } catch (IOException e) {
+        } catch (Exception e) {
             exceptionHandler.handleException(e);
         }
         return this;
     }
 
-    public final Editor bulkInsert() {
-        return new Editor();
+    public final BulkEditor bulkInsert() {
+        return new BulkEditor();
     }
 
-    public class Editor extends AbstractEditor<Editor> {
+    public class BulkEditor extends Editor<BulkEditor> {
         List<KVStorage.KeyValue> list = new ArrayList<>(4);
 
-        @Override public Editor put(byte[] key, byte[] value) {
+        @Override public BulkEditor put(byte[] key, byte[] value) {
             list.add(new KVStorage.KeyValue(key, value));
             return this;
         }
 
-        @Override public Editor remove(byte[] key) {
+        @Override public BulkEditor remove(byte[] key) {
             list.add(new KVStorage.KeyValue(key, null));
             return this;
         }

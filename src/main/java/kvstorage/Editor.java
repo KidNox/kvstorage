@@ -1,6 +1,6 @@
 package kvstorage;
 
-public abstract class AbstractEditor<T extends AbstractEditor> {
+public abstract class Editor<T extends Editor> {
     public final T put(String key, boolean value) {
         byte[] out = new byte[1];
         ByteUtils.writeBoolean(out, 0, value);

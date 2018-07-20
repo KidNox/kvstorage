@@ -2,12 +2,19 @@ package kvstorage;
 
 import java.io.*;
 
-public class KVFileStorage extends KVByteStorage {
+public class ByteFileStorage implements ByteStorage {
     private final File file;
     private final StreamWrapper streamWrapper;
+    private final boolean strictWrite;
 
-    public KVFileStorage(File file) {
-        this(file, new StreamWrapper() {
+    protected ByteFileStorage(File file) {
+        this(file, false, null);
+    }
+
+    protected ByteFileStorage(File file, boolean strictWrite, StreamWrapper streamWrapper) {
+        this.file = file;
+        this.strictWrite = strictWrite;
+        this.streamWrapper = streamWrapper != null ? streamWrapper : new StreamWrapper() {
             @Override public InputStream input(InputStream is) throws IOException {
                 return is;
             }
@@ -15,15 +22,14 @@ public class KVFileStorage extends KVByteStorage {
             @Override public OutputStream output(OutputStream os) throws IOException {
                 return os;
             }
-        });
+        };
     }
 
-    public KVFileStorage(File file, StreamWrapper streamWrapper) {
-        this.file = file;
-        this.streamWrapper = streamWrapper;
+    protected KVStorage createStorage() throws IOException {
+        return new KVByteStorage(this);
     }
 
-    @Override protected byte[] readBuffer() throws IOException {
+    @Override public byte[] read() throws IOException {
         byte[] result = null;
         try {
             if (file.exists()) {
@@ -50,19 +56,19 @@ public class KVFileStorage extends KVByteStorage {
         }
     }
 
-    @Override protected void writeBuffer(byte[] newBuffer) throws IOException {
+    @Override public synchronized void write(byte[] bytes) throws IOException {
         File tmpFile = tempFile();
         boolean success;
         try {
-            writeBuffer(newBuffer, tmpFile);
+            writeBuffer(bytes, tmpFile);
             success = tmpFile.renameTo(file);
         } catch (IOException ex) {
-            throw new IOException("writeBuffer " + newBuffer.length, ex);
+            throw new IOException("writeBuffer " + bytes.length, ex);
         } finally {
             tmpFile.delete();
         }
-        if(!success) {
-            throw new IOException("writeBuffer failed" + newBuffer.length);
+        if (!success) {
+            throw new IOException("writeBuffer failed" + bytes.length);
         }
     }
 
@@ -76,11 +82,13 @@ public class KVFileStorage extends KVByteStorage {
             closeQuietly(stream);
             throw ex;
         }
-        try {
-            fos.getFD().sync();
-        } catch (Exception ignored) {
-        } finally {
-            closeQuietly(stream);
+        if (strictWrite) {
+            try {
+                fos.getFD().sync();
+            } catch (Exception ignored) {
+            } finally {
+                closeQuietly(stream);
+            }
         }
     }
 
@@ -95,33 +103,5 @@ public class KVFileStorage extends KVByteStorage {
             } catch (IOException ignored) {
             }
         }
-    }
-
-    @Override public synchronized void loadToBuffer() throws IOException {
-        super.loadToBuffer();
-    }
-
-    @Override public synchronized void put(KeyValue... keyValues) throws IOException {
-        super.put(keyValues);
-    }
-
-    @Override public synchronized void put(byte[] key, byte[] value) throws IOException {
-        super.put(key, value);
-    }
-
-    @Override public synchronized boolean remove(byte[] key) throws IOException {
-        return super.remove(key);
-    }
-
-    @Override public synchronized byte[] get(byte[] key) throws IOException {
-        return super.get(key);
-    }
-
-    @Override public synchronized void clear() throws IOException {
-        super.clear();
-    }
-
-    @Override public synchronized byte[] snapshot() throws IOException {
-        return super.snapshot();
     }
 }

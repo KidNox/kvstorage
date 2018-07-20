@@ -12,12 +12,8 @@ import static org.junit.Assert.*;
 public class KVByteStorageTest {
     private KVStorageImpl kvStorage;
 
-    @Before public void setUp() {
+    @Before public void setUp() throws IOException {
         kvStorage = new KVStorageImpl();
-    }
-
-    @Test public void testEmptyBuffer() throws IOException {
-        kvStorage.ensureBufferInitialized();
     }
 
     @Test public void testEmptyClear() throws IOException {
